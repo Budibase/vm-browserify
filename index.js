@@ -1,10 +1,8 @@
-var indexOf = function (xs, item) {
-    if (xs.indexOf) return xs.indexOf(item);
-    else for (var i = 0; i < xs.length; i++) {
-        if (xs[i] === item) return i;
-    }
-    return -1;
-};
+var indexOf = require('indexof');
+
+// cached iFrame instance, re-use for each runInContext Call.
+var iFrame = null;
+
 var Object_keys = function (obj) {
     if (Object.keys) return Object.keys(obj)
     else {
@@ -40,69 +38,75 @@ var defineProp = (function() {
 }());
 
 var globals = ['Array', 'Boolean', 'Date', 'Error', 'EvalError', 'Function',
-'Infinity', 'JSON', 'Math', 'NaN', 'Number', 'Object', 'RangeError',
-'ReferenceError', 'RegExp', 'String', 'SyntaxError', 'TypeError', 'URIError',
-'decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape',
-'eval', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'undefined', 'unescape'];
+    'Infinity', 'JSON', 'Math', 'NaN', 'Number', 'Object', 'RangeError',
+    'ReferenceError', 'RegExp', 'String', 'SyntaxError', 'TypeError', 'URIError',
+    'decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape',
+    'eval', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'undefined', 'unescape'];
 
 function Context() {}
 Context.prototype = {};
 
 var Script = exports.Script = function NodeScript (code) {
     if (!(this instanceof Script)) return new Script(code);
+    if(!iFrame) {
+        iFrame = document.createElement('iframe');
+        if (!iFrame.style) iFrame.style = {};
+        iFrame.style.display = 'none';
+
+        document.body.appendChild(iFrame);
+    }
     this.code = code;
+    this.iFrame = iFrame;
 };
 
 Script.prototype.runInContext = function (context) {
     if (!(context instanceof Context)) {
         throw new TypeError("needs a 'context' argument.");
     }
-    
-    var iframe = document.createElement('iframe');
-    if (!iframe.style) iframe.style = {};
-    iframe.style.display = 'none';
-    
-    document.body.appendChild(iframe);
-    
-    var win = iframe.contentWindow;
+    var win = this.iFrame.contentWindow;
+    var winOriginal = Object_keys(win);
+    let originalToRestore = [];
     var wEval = win.eval, wExecScript = win.execScript;
+
+    forEach(Object_keys(context), function (key) {
+        if(win[key] !== undefined) {
+            let restore = {
+                'key': key,
+                'value': win[key]
+            };
+            originalToRestore.push(restore);
+        }
+        win[key] = context[key];
+    });
 
     if (!wEval && wExecScript) {
         // win.eval() magically appears when this is called in IE:
         wExecScript.call(win, 'null');
         wEval = win.eval;
     }
-    
-    forEach(Object_keys(context), function (key) {
-        win[key] = context[key];
-    });
-    forEach(globals, function (key) {
-        if (context[key]) {
-            win[key] = context[key];
-        }
-    });
-    
+
+
     var winKeys = Object_keys(win);
 
     var res = wEval.call(win, this.code);
-    
+
     forEach(Object_keys(win), function (key) {
         // Avoid copying circular objects like `top` and `window` by only
         // updating existing context properties or new properties in the `win`
         // that was only introduced after the eval.
         if (key in context || indexOf(winKeys, key) === -1) {
-            context[key] = win[key];
+            if (indexOf(globals, key) === -1) context[key] = win[key];
+            else defineProp(context, key, win[key]);
         }
+        // delete win context of extra fields
+        if (indexOf(winOriginal, key) === -1) delete win[key];
     });
 
-    forEach(globals, function (key) {
-        if (!(key in context)) {
-            defineProp(context, key, win[key]);
-        }
+    // restore context to original field values
+    forEach(originalToRestore, function (orig) {
+        win[orig.key] = orig.value;
     });
-    
-    document.body.removeChild(iframe);
-    
+
     return res;
 };
 
@@ -114,11 +118,9 @@ Script.prototype.runInNewContext = function (context) {
     var ctx = Script.createContext(context);
     var res = this.runInContext(ctx);
 
-    if (context) {
-        forEach(Object_keys(ctx), function (key) {
-            context[key] = ctx[key];
-        });
-    }
+    forEach(Object_keys(ctx), function (key) {
+        context[key] = ctx[key];
+    });
 
     return res;
 };
@@ -129,10 +131,6 @@ forEach(Object_keys(Script.prototype), function (name) {
         return s[name].apply(s, [].slice.call(arguments, 1));
     };
 });
-
-exports.isContext = function (context) {
-    return context instanceof Context;
-};
 
 exports.createScript = function (code) {
     return exports.Script(code);
