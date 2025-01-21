@@ -1,18 +1,20 @@
 {
-  "name": "vm-browserify",
+  "name": "@budibase/vm-browserify",
   "version": "1.1.2",
-  "description": "vm module for the browser",
+  "description": "vm module for the browser - allows re-using iframe.",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "http://github.com/browserify/vm-browserify.git"
+    "url": "http://github.com/budibase/vm-browserify.git"
   },
   "keywords": [
     "vm",
     "browser",
     "eval"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "indexof": "^0.0.1"
+  },
   "devDependencies": {
     "browserify": "^16.1.1",
     "tape": "^4.11.0",
