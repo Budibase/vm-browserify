@@ -41,7 +41,8 @@ var globals = ['Array', 'Boolean', 'Date', 'Error', 'EvalError', 'Function',
     'Infinity', 'JSON', 'Math', 'NaN', 'Number', 'Object', 'RangeError',
     'ReferenceError', 'RegExp', 'String', 'SyntaxError', 'TypeError', 'URIError',
     'decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape',
-    'eval', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'undefined', 'unescape'];
+    'eval', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'undefined', 'unescape',
+    'window', 'document'];
 
 function Context() {}
 Context.prototype = {};
@@ -50,6 +51,7 @@ var Script = exports.Script = function NodeScript (code) {
     if (!(this instanceof Script)) return new Script(code);
     if(!iFrame) {
         iFrame = document.createElement('iframe');
+        iFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
         if (!iFrame.style) iFrame.style = {};
         iFrame.style.display = 'none';
 
